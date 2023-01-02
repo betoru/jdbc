@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -15,7 +16,11 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 public class ConnectionTest {
 
   @Test
+  @DisplayName("DriverManager 를 사용하여 Connection 을 직접 얻는다")
   void driverManager() throws SQLException {
+    /**
+     * 두개를 연속적으로 얻으면?
+     */
     Connection con1 = DriverManager.getConnection(URL, USERNAME, PASSWORD);
     Connection con2 = DriverManager.getConnection(URL, USERNAME, PASSWORD);
     log.info("connection={}, class={}", con1, con1.getClass());
@@ -24,24 +29,26 @@ public class ConnectionTest {
   }
 
   @Test
+  @DisplayName("스프링이 제공하는 DataSourceDriverManager 를 사용하여 Connection 을 얻는다")
   void dataSourceDriverManager() throws SQLException {
     //DriverManagerDataSource - 항상 새로운 커넥션을 획득
     DriverManagerDataSource dataSource = new DriverManagerDataSource(URL, USERNAME,
-        PASSWORD);
+          PASSWORD);
     useDataSource(dataSource);
   }
 
   @Test
   void dataSourceConnectionPool() throws SQLException, InterruptedException {
-    //커넥션 풀링
+    //커넥션 풀링 : HikariProxyConnection(proxy) -> JdbcConnection(Target)
     HikariDataSource dataSource = new HikariDataSource();
     dataSource.setJdbcUrl(URL);
     dataSource.setUsername(USERNAME);
     dataSource.setPassword(PASSWORD);
     dataSource.setMaximumPoolSize(10);
     dataSource.setPoolName("MyPool");
+
     useDataSource(dataSource);
-    Thread.sleep(1000);
+    Thread.sleep(1000); //커넥션 풀에서 커넥션 생성 시간 대기
   }
 
   private void useDataSource(DataSource dataSource) throws SQLException {

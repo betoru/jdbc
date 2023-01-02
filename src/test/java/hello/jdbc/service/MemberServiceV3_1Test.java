@@ -1,38 +1,41 @@
 package hello.jdbc.service;
 
-import static hello.jdbc.connection.ConnectionConst.PASSWORD;
-import static hello.jdbc.connection.ConnectionConst.URL;
-import static hello.jdbc.connection.ConnectionConst.USERNAME;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import hello.jdbc.domain.Member;
 import hello.jdbc.repository.MemberRepositoryV2;
-import java.sql.SQLException;
+import hello.jdbc.repository.MemberRepositoryV3;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import java.sql.SQLException;
+
+import static hello.jdbc.connection.ConnectionConst.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 트랜잭션 - 커넥션 파라미터 전달 방식 동기화
+ * 트랜잭션 - 트랜잭셔 매니저를 사용할거임
  */
-class MemberServiceV2Test {
+class MemberServiceV3_1Test {
 
   public static final String MEMBER_A = "memberA";
   public static final String MEMBER_B = "memberB";
   public static final String MEMBER_EX = "ex";
 
-  private MemberRepositoryV2 memberRepository;
-  private MemberServiceV2 memberService;
+  private MemberRepositoryV3 memberRepository;
+  private MemberServiceV3_1 memberService;
 
   //beforeEach 를 통해서 값을 셋업해줄거임
   @BeforeEach
   void before() {
     DriverManagerDataSource dataSource = new DriverManagerDataSource(URL, USERNAME, PASSWORD);
-    memberRepository = new MemberRepositoryV2(dataSource);
-    memberService = new MemberServiceV2(dataSource,memberRepository);
+    memberRepository = new MemberRepositoryV3(dataSource);
+    PlatformTransactionManager transactionManager = new DataSourceTransactionManager(dataSource);
+    memberService = new MemberServiceV3_1(transactionManager,memberRepository);
   }
 
   @AfterEach
@@ -78,7 +81,7 @@ class MemberServiceV2Test {
     //then
     Member findMemberA = memberRepository.findById(memberA.getMemberId());
     Member findMemberB = memberRepository.findById(memberEx.getMemberId());
-    assertThat(findMemberA.getMoney()).isEqualTo(8000);
+    assertThat(findMemberA.getMoney()).isEqualTo(10000);
     assertThat(findMemberB.getMoney()).isEqualTo(10000);
   }
 }

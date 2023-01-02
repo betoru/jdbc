@@ -2,19 +2,24 @@ package hello.jdbc.repository;
 
 import hello.jdbc.connection.DBConnectionUtil;
 import hello.jdbc.domain.Member;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.NoSuchElementException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.support.JdbcUtils;
+
+import javax.sql.DataSource;
+import java.sql.*;
+import java.util.NoSuchElementException;
 
 /**
- * JDBC - DriverManager 사용
+ * JDBC - DataSource 애플리케이션에 적용, JdbcUtils 사용
  */
 @Slf4j
-public class MemberRepositoryV0 {
+public class MemberRepositoryV1_1 {
+  //DataSource 의존관계 주입
+  private final DataSource dataSource;
+
+  public MemberRepositoryV1_1(DataSource dataSource) {
+    this.dataSource = dataSource;
+  }
 
   public Member save(Member member) throws SQLException {
     String sql = "insert into member(member_id, money) values(?,?)";
@@ -106,22 +111,15 @@ public class MemberRepositoryV0 {
   }
 
   private void close(Connection con, Statement stmt, ResultSet rs) {
-    if (stmt != null) {
-      try {
-        stmt.close();
-      } catch (SQLException e) {
-        log.info("error", e);
-      }
-    }
-    if (con != null) {
-      try {
-        con.close();
-      } catch (SQLException e) {
-        log.error("error", e);
-      }
-    }
+    //스프링이 제공하는 JdbcUtils 메서드 사용
+    JdbcUtils.closeResultSet(rs);
+    JdbcUtils.closeStatement(stmt);
+    JdbcUtils.closeConnection(con);
   }
-  private Connection getConnection() {
-    return DBConnectionUtil.getConnection();
+  private Connection getConnection() throws SQLException {
+    Connection con = dataSource.getConnection();
+    log.info("get connection={} class={}", con, con.getClass());
+    return con;
   }
+
 }

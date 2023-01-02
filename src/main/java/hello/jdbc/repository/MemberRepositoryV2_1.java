@@ -1,32 +1,33 @@
 package hello.jdbc.repository;
 
-import hello.jdbc.connection.DBConnectionUtil;
 import hello.jdbc.domain.Member;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.NoSuchElementException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.support.JdbcUtils;
+
+import javax.sql.DataSource;
+import java.sql.*;
+import java.util.NoSuchElementException;
 
 /**
- * JDBC - DriverManager 사용
+ * JDBC - 동일한 트랜잭션을 위해 가장 단순하게 Connection 을 파라미터로 넘기는 예제
  */
 @Slf4j
-public class MemberRepositoryV0 {
+public class MemberRepositoryV2_1 {
+
+  private final DataSource dataSource;
+
+  public MemberRepositoryV2_1(DataSource dataSource) {
+    this.dataSource = dataSource;
+  }
 
   public Member save(Member member) throws SQLException {
     String sql = "insert into member(member_id, money) values(?,?)";
     Connection con = null;
-    //PreparedStatement 와 Statement 의 차이점
-    //PreparedStatement 는 sql 을 미리 컴파일 해놓고 실행할 때 바인딩 값을 넣어서 실행한다.
-    //Statement 는 단순히 sql 을 실행
     PreparedStatement pstm = null;
 
     try {
       con = getConnection();
-      pstm = con.prepareStatement(sql);
+      pstm= con.prepareStatement(sql);
       pstm.setString(1, member.getMemberId());
       pstm.setInt(2, member.getMoney());
       pstm.executeUpdate();
@@ -35,7 +36,7 @@ public class MemberRepositoryV0 {
       log.error("db error", e);
       throw e;
     }finally {
-      close(con, pstm, null);
+      close(con,pstm,null);
     }
   }
 
@@ -65,6 +66,33 @@ public class MemberRepositoryV0 {
       close(con, pstmt, rs);
     }
   }
+  //조회
+  public Member findById(Connection con, String memberId) throws SQLException {
+    String sql = "select * from member where member_id =?";
+    PreparedStatement pstmt = null;
+    ResultSet rs = null;
+    try {
+      pstmt = con.prepareStatement(sql);
+      pstmt.setString(1, memberId);
+      rs = pstmt.executeQuery();
+      if (rs.next()) {
+        Member member = new Member();
+        member.setMemberId(rs.getString("member_id"));
+        member.setMoney(rs.getInt("money"));
+        return member;
+      } else {
+        throw new NoSuchElementException("member not found memberId=" + memberId);
+      }
+    } catch (SQLException e) {
+      log.info("db error",e);
+      throw e;
+    } finally {
+      //connection 은 repository 가 아닌 service 로직이 끝나고 닫아야하므로 service 에서 close 해야 함.
+      JdbcUtils.closeResultSet(rs);
+      JdbcUtils.closeStatement(pstmt);
+//      JdbcUtils.closeConnection(con);
+    }
+  }
 
   public void update(String memberId, int money) throws SQLException {
     String sql = "update member set money=? where member_id=?";
@@ -84,6 +112,26 @@ public class MemberRepositoryV0 {
     }
     finally {
       close(con, pstmt, null);
+    }
+  }
+  public void update(Connection con, String memberId, int money) throws SQLException {
+    String sql = "update member set money=? where member_id=?";
+    PreparedStatement pstmt = null;
+    try {
+      pstmt = con.prepareStatement(sql);
+      pstmt.setInt(1, money);
+      pstmt.setString(2, memberId);
+      int resultSize = pstmt.executeUpdate();
+      log.info("resultSize={}", resultSize);
+
+    } catch (SQLException e) {
+      log.info("db error",e);
+      throw e;
+    }
+    finally {
+//      JdbcUtils.closeResultSet(rs);
+      JdbcUtils.closeStatement(pstmt);
+//      JdbcUtils.closeConnection(con);
     }
   }
 
@@ -106,22 +154,13 @@ public class MemberRepositoryV0 {
   }
 
   private void close(Connection con, Statement stmt, ResultSet rs) {
-    if (stmt != null) {
-      try {
-        stmt.close();
-      } catch (SQLException e) {
-        log.info("error", e);
-      }
-    }
-    if (con != null) {
-      try {
-        con.close();
-      } catch (SQLException e) {
-        log.error("error", e);
-      }
-    }
+    JdbcUtils.closeResultSet(rs);
+    JdbcUtils.closeStatement(stmt);
+    JdbcUtils.closeConnection(con);
   }
-  private Connection getConnection() {
-    return DBConnectionUtil.getConnection();
+  private Connection getConnection() throws SQLException {
+    Connection con = dataSource.getConnection();
+    log.info("get connection={}, class={}", con, con.getClass());
+    return con;
   }
 }

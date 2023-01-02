@@ -1,32 +1,36 @@
 package hello.jdbc.repository;
 
-import hello.jdbc.connection.DBConnectionUtil;
 import hello.jdbc.domain.Member;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.NoSuchElementException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.datasource.DataSourceUtils;
+import org.springframework.jdbc.support.JdbcUtils;
+
+import javax.sql.DataSource;
+import java.sql.*;
+import java.util.NoSuchElementException;
 
 /**
- * JDBC - DriverManager 사용
+ * 트랜잭션 - 트랜잭션 매니저
+ * DataSourceUtils.getConnection() // 커넥션 획득할 때
+ * DataSourceUtils.releaseConnection() // 닫을 때
  */
 @Slf4j
-public class MemberRepositoryV0 {
+public class MemberRepositoryV3_1 {
+
+  private final DataSource dataSource;
+
+  public MemberRepositoryV3_1(DataSource dataSource) {
+    this.dataSource = dataSource;
+  }
 
   public Member save(Member member) throws SQLException {
     String sql = "insert into member(member_id, money) values(?,?)";
     Connection con = null;
-    //PreparedStatement 와 Statement 의 차이점
-    //PreparedStatement 는 sql 을 미리 컴파일 해놓고 실행할 때 바인딩 값을 넣어서 실행한다.
-    //Statement 는 단순히 sql 을 실행
     PreparedStatement pstm = null;
 
     try {
       con = getConnection();
-      pstm = con.prepareStatement(sql);
+      pstm= con.prepareStatement(sql);
       pstm.setString(1, member.getMemberId());
       pstm.setInt(2, member.getMoney());
       pstm.executeUpdate();
@@ -35,11 +39,9 @@ public class MemberRepositoryV0 {
       log.error("db error", e);
       throw e;
     }finally {
-      close(con, pstm, null);
+      close(con,pstm,null);
     }
   }
-
-  //조회
   public Member findById(String memberId) throws SQLException {
     String sql = "select * from member where member_id =?";
     Connection con = null;
@@ -65,7 +67,6 @@ public class MemberRepositoryV0 {
       close(con, pstmt, rs);
     }
   }
-
   public void update(String memberId, int money) throws SQLException {
     String sql = "update member set money=? where member_id=?";
     Connection con = null;
@@ -106,22 +107,15 @@ public class MemberRepositoryV0 {
   }
 
   private void close(Connection con, Statement stmt, ResultSet rs) {
-    if (stmt != null) {
-      try {
-        stmt.close();
-      } catch (SQLException e) {
-        log.info("error", e);
-      }
-    }
-    if (con != null) {
-      try {
-        con.close();
-      } catch (SQLException e) {
-        log.error("error", e);
-      }
-    }
+    JdbcUtils.closeResultSet(rs);
+    JdbcUtils.closeStatement(stmt);
+    //주의! 트랜잭션 동기화를 사용하려면 DataSourceUtils.releaseConnection() 사용해야 함
+    DataSourceUtils.releaseConnection(con, dataSource);
   }
-  private Connection getConnection() {
-    return DBConnectionUtil.getConnection();
+  private Connection getConnection() throws SQLException {
+    //주의! 트랜잭션 동기화를 사용하려면 DataSourceUtils.getConnection() 를 사용해야 함
+    Connection con = DataSourceUtils.getConnection(dataSource);
+    log.info("get connection={}, class={}", con, con.getClass());
+    return con;
   }
 }

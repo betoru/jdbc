@@ -17,13 +17,15 @@ class MemberRepositoryV0Test {
   @Test
   void crud() throws SQLException {
 
-    //save
+    //save 등록
     Member member = new Member("memberV100", 10000);
     repository.save(member);
 
-    //findById
+    //findById 조회
     Member findMember = repository.findById(member.getMemberId());
     log.info("findMember={}", findMember);
+    log.info("member == findMember ? {}", member == findMember); //인스턴스가 다르므로 false
+    log.info("member equals findMember ? {}", member.equals(findMember)); //lombok Data 어노테이션으로 equals, hashCode 오버라이딩 되어있음
     assertThat(findMember).isEqualTo(member);
 
     //update : money : 10000 -> 20000

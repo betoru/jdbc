@@ -1,39 +1,77 @@
 package hello.jdbc.service;
 
-import static hello.jdbc.connection.ConnectionConst.PASSWORD;
-import static hello.jdbc.connection.ConnectionConst.URL;
-import static hello.jdbc.connection.ConnectionConst.USERNAME;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import hello.jdbc.domain.Member;
-import hello.jdbc.repository.MemberRepositoryV2;
-import java.sql.SQLException;
+import hello.jdbc.repository.MemberRepositoryV3;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import javax.sql.DataSource;
+import java.sql.SQLException;
+
+import static hello.jdbc.connection.ConnectionConst.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 트랜잭션 - 커넥션 파라미터 전달 방식 동기화
+ * 트랜잭션 - @Transaction AOP 적용
  */
-class MemberServiceV2Test {
+@Slf4j
+@SpringBootTest
+class MemberServiceV3_3Test {
 
   public static final String MEMBER_A = "memberA";
   public static final String MEMBER_B = "memberB";
   public static final String MEMBER_EX = "ex";
 
-  private MemberRepositoryV2 memberRepository;
-  private MemberServiceV2 memberService;
+  /**
+   * 각 레이어 의존관계 주입
+   */
+  @Autowired
+  private MemberRepositoryV3 memberRepository;
+  @Autowired
+  private MemberServiceV3_3  memberService;
+
+  @TestConfiguration
+  static class TestConfig {
+    @Bean
+    DataSource dataSource() {
+      return new DriverManagerDataSource(URL, USERNAME, PASSWORD);
+    }
+
+    @Bean
+    PlatformTransactionManager transactionManager() {
+      return new DataSourceTransactionManager(dataSource());
+    }
+
+    @Bean
+    MemberRepositoryV3 memberRepositoryV3() {
+        return new MemberRepositoryV3(dataSource());
+    }
+
+    @Bean
+    MemberServiceV3_3 memberServiceV3_3() {
+        return new MemberServiceV3_3(memberRepositoryV3());
+    }
+
+  }
 
   //beforeEach 를 통해서 값을 셋업해줄거임
-  @BeforeEach
+  /*@BeforeEach
   void before() {
     DriverManagerDataSource dataSource = new DriverManagerDataSource(URL, USERNAME, PASSWORD);
-    memberRepository = new MemberRepositoryV2(dataSource);
-    memberService = new MemberServiceV2(dataSource,memberRepository);
-  }
+    memberRepository = new MemberRepositoryV3(dataSource);
+    memberService = new MemberServiceV3_3 (memberRepository);
+  }*/
 
   @AfterEach
   void after() throws SQLException {
@@ -78,7 +116,7 @@ class MemberServiceV2Test {
     //then
     Member findMemberA = memberRepository.findById(memberA.getMemberId());
     Member findMemberB = memberRepository.findById(memberEx.getMemberId());
-    assertThat(findMemberA.getMoney()).isEqualTo(8000);
+    assertThat(findMemberA.getMoney()).isEqualTo(10000);
     assertThat(findMemberB.getMoney()).isEqualTo(10000);
   }
 }
